@@ -2,86 +2,81 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    public Rigidbody rb;
-    public float speed = 8f;
-    public float jump;
-    public float maxVelocity;
-    public enum RotationAxes { MouseXAndY = 0, MouseX = 1, MouseY = 2 }
-    public RotationAxes axes = RotationAxes.MouseXAndY;
-    public float sensitivityX = 15F;
-    public float sensitivityY = 15F;
+    [Header("Movement")]
+    public float moveForce = 25f;     // сила движения
+    public float maxVelocity = 8f;    // лимит скорости
+    public float jumpImpulse = 6f;    // сила прыжка (импульс)
 
-    public float minimumX = -360F;
-    public float maximumX = 360F;
+    [Header("Mouse Look")]
+    public float sensitivityX = 15f;
+    public float sensitivityY = 15f;
+    public float minY = -60f;
+    public float maxY = 60f;
 
-    public float minimumY = -60F;
-    public float maximumY = 60F;
-
-    float rotationY = 0F;
-
-    void Update()
-    {
-        if (axes == RotationAxes.MouseXAndY)
-        {
-            float rotationX = transform.localEulerAngles.y + Input.GetAxis("Mouse X") * sensitivityX;
-
-            rotationY += Input.GetAxis("Mouse Y") * sensitivityY;
-            rotationY = Mathf.Clamp(rotationY, minimumY, maximumY);
-
-            transform.localEulerAngles = new Vector3(-rotationY, rotationX, 0);
-        }
-        else if (axes == RotationAxes.MouseX)
-        {
-            transform.Rotate(0, Input.GetAxis("Mouse X") * sensitivityX, 0);
-        }
-        else
-        {
-            rotationY += Input.GetAxis("Mouse Y") * sensitivityY;
-            rotationY = Mathf.Clamp(rotationY, minimumY, maximumY);
-
-            transform.localEulerAngles = new Vector3(-rotationY, transform.localEulerAngles.y, 0);
-        }
-    }
+    private Rigidbody rb;
+    private float rotY;
+    private bool canJump;
 
     void Start()
     {
-        // Make the rigid body not change rotation 
-        if (GetComponent<Rigidbody>())
-            GetComponent<Rigidbody>().freezeRotation = true;
+        rb = GetComponent<Rigidbody>();
+        rb.freezeRotation = true;
+
         Cursor.lockState = CursorLockMode.Locked;
-        Cursor.lockState = CursorLockMode.None;
         Cursor.visible = false;
     }
-    void FixedUpdate()
-    {
-        if (Input.GetKey(KeyCode.W))
-        {
-            rb.AddForce(transform.forward * speed * Time.deltaTime, ForceMode.Impulse);
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            rb.AddForce(transform.right * speed * Time.deltaTime, ForceMode.Impulse);
-        }
-        if (Input.GetKey(KeyCode.A))
-        {
-            rb.AddForce(-transform.right * speed * Time.deltaTime, ForceMode.Impulse);
-        }
-        if (Input.GetKey(KeyCode.S))
-        {
-            rb.AddForce(-transform.forward * speed * Time.deltaTime, ForceMode.Impulse);
-        }
-        if (Input.GetKey(KeyCode.Space))
-        {
-            rb.AddForce(transform.up * jump * Time.deltaTime, ForceMode.Impulse);
-        }
 
-        if (rb.velocity.magnitude >= maxVelocity)
-        {
-            rb.velocity = rb.velocity.normalized * maxVelocity;
-        }
+
+    // Если нужно "пока касается", можно оставить и это:
+    private void OnCollisionStay(Collision collision)
+    {
+        canJump = true;
     }
 
+    // Если вместо коллизий ты используешь Trigger'ы — включи isTrigger и используй это:
+    private void OnTriggerEnter(Collider other)
+    {
+        canJump = true;
+        // Debug.Log("Trigger: " + other.name);
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        canJump = true;
+    }
+
+    void Update()
+    {
+        // Поворот мышью
+        float rotX = transform.localEulerAngles.y + Input.GetAxis("Mouse X") * sensitivityX;
+
+        rotY += Input.GetAxis("Mouse Y") * sensitivityY;
+        rotY = Mathf.Clamp(rotY, minY, maxY);
+
+        transform.localEulerAngles = new Vector3(-rotY, rotX, 0);
+    }
+
+    void FixedUpdate()
+    {
+        // Движение WASD
+        Vector3 dir = Vector3.zero;
+        if (Input.GetKey(KeyCode.W)) dir += transform.forward;
+        if (Input.GetKey(KeyCode.S)) dir -= transform.forward;
+        if (Input.GetKey(KeyCode.D)) dir += transform.right;
+        if (Input.GetKey(KeyCode.A)) dir -= transform.right;
+
+        if (dir.sqrMagnitude > 0f)
+            rb.AddForce(dir.normalized * moveForce, ForceMode.Force);
+
+        // Прыжок (разрешён, если касались чего-то)
+        if (Input.GetKeyDown(KeyCode.Space) && canJump)
+        {
+            rb.AddForce(Vector3.up * jumpImpulse, ForceMode.Impulse);
+            canJump = false;
+        }
+
+        // Ограничение скорости
+        if (rb.velocity.magnitude > maxVelocity)
+            rb.velocity = rb.velocity.normalized * maxVelocity;
+    }
 }
-
-
-
